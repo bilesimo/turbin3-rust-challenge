@@ -1,9 +1,10 @@
 #[cfg(test)] 
 mod tests {
-  use solana_sdk::signature::{Keypair, Signer, read_keypair_file};
+  use solana_sdk::{signature::{Keypair, Signer, read_keypair_file}, transaction::Transaction};
   use bs58;
   use std::{io::{self, BufRead}, thread::sleep, time::Duration};
   use solana_client::rpc_client::RpcClient;
+  use solana_program::system_instruction::transfer;
 
   const RPC_URL: &str = "https://api.devnet.solana.com";
 
@@ -84,5 +85,36 @@ mod tests {
   }
 
   #[test]
-  fn transfer_sol() {}
+  fn transfer_sol() {
+    let from_keypair = read_keypair_file("dev-wallet.json").expect("Couldn't find dev-wallet file");
+    let to_keypair = read_keypair_file("Turbin3-wallet.json").expect("Couldn't find Turbin3-wallet file");
+    let to_pubkey = &to_keypair.pubkey();
+
+    let rpc_client = RpcClient::new(RPC_URL);
+    let recent_blockhash = rpc_client .get_latest_blockhash().expect("Failed to get recent blockhash");
+    let transaction = Transaction::new_signed_with_payer( 
+      &[transfer(
+        &from_keypair.pubkey(), 
+        &to_pubkey, 
+        100_000_000
+      )], 
+      Some(&from_keypair.pubkey()), 
+      &vec![&from_keypair], 
+      recent_blockhash
+    );
+
+    match rpc_client.send_and_confirm_transaction(&transaction) {
+      Ok(signature) => {
+          println!(
+              "Success! Check out your TX here: https://explorer.solana.com/tx/{}/?cluster=devnet",
+              signature
+          );
+      }
+      Err(e) => {
+          println!("Transaction failed: {}", e);
+      }
+  }
+
+  }
+
 }

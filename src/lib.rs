@@ -1,6 +1,6 @@
 #[cfg(test)] 
 mod tests {
-  use solana_sdk::{signature::{Keypair, Signer, read_keypair_file}, transaction::Transaction};
+  use solana_sdk::{signature::{Keypair, Signer, read_keypair_file}, transaction::Transaction, message::Message};
   use bs58;
   use std::{io::{self, BufRead}, thread::sleep, time::Duration};
   use solana_client::rpc_client::RpcClient;
@@ -89,14 +89,29 @@ mod tests {
     let from_keypair = read_keypair_file("dev-wallet.json").expect("Couldn't find dev-wallet file");
     let to_keypair = read_keypair_file("Turbin3-wallet.json").expect("Couldn't find Turbin3-wallet file");
     let to_pubkey = &to_keypair.pubkey();
-
+    
     let rpc_client = RpcClient::new(RPC_URL);
     let recent_blockhash = rpc_client .get_latest_blockhash().expect("Failed to get recent blockhash");
+
+    let balance = rpc_client.get_balance(&from_keypair.pubkey()).expect("Failed to get balance");
+
+    let message = Message::new_with_blockhash(
+      &[transfer(
+        &from_keypair.pubkey(), 
+        &to_pubkey, 
+        balance
+      )],  
+      Some(&from_keypair.pubkey()), 
+      &recent_blockhash
+    );
+
+    let fee = rpc_client.get_fee_for_message(&message).expect("Failed to get fee calculator");
+
     let transaction = Transaction::new_signed_with_payer( 
       &[transfer(
         &from_keypair.pubkey(), 
         &to_pubkey, 
-        100_000_000
+        balance - fee
       )], 
       Some(&from_keypair.pubkey()), 
       &vec![&from_keypair], 
